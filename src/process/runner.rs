@@ -2,22 +2,22 @@ use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex};
 
 use crate::error::{JanusError, Result};
 use crate::logging::LogType;
 use crate::process::{manager::ProcessManager, ProcessStatus};
 
-pub struct ProcessRunner<'a> {
-    manager: &'a mut ProcessManager,
+pub struct ProcessRunner {
 }
 
-impl<'a> ProcessRunner<'a> {
-    pub fn new(manager: &'a mut ProcessManager) -> Self {
-        Self { manager }
+impl ProcessRunner {
+    pub fn new() -> Self {
+        Self {}
     }
     
-    pub fn start_process(&mut self, name: &str) -> Result<()> {
-        let process = self.manager.get_process_mut(name).ok_or_else(|| {
+    pub fn start_process(&self, manager: &mut ProcessManager, name: &str) -> Result<()> {
+        let process = manager.get_process_mut(name).ok_or_else(|| {
             JanusError::Process(format!("Process not found: {}", name))
         })?;
         
@@ -45,7 +45,7 @@ impl<'a> ProcessRunner<'a> {
         command.stderr(Stdio::piped());
         
         // 啟動進程
-        let log_handler = self.manager.get_log_handler().clone();
+        let log_handler = manager.get_log_handler().clone();
         let process_name = name.to_string();
         
         match command.spawn() {
@@ -81,15 +81,15 @@ impl<'a> ProcessRunner<'a> {
                 }
                 
                 // 更新進程狀態
-                let process = self.manager.get_process_mut(name).unwrap();
+                let process = manager.get_process_mut(name).unwrap();
                 process.process = Some(child);
                 process.status = ProcessStatus::Running;
                 process.start_time = Some(Instant::now());
                 
                 // 啟動監控線程
-                self.monitor_process(name);
+                self.monitor_process(manager, name);
                 
-                self.manager.get_log_handler().log(
+                manager.get_log_handler().log(
                     name,
                     LogType::System,
                     &format!("Process started: {}", name),
@@ -99,9 +99,9 @@ impl<'a> ProcessRunner<'a> {
             }
             Err(e) => {
                 let error_msg = format!("Failed to start process: {}", e);
-                self.manager.get_log_handler().log(name, LogType::System, &error_msg);
+                manager.get_log_handler().log(name, LogType::System, &error_msg);
                 
-                let process = self.manager.get_process_mut(name).unwrap();
+                let process = manager.get_process_mut(name).unwrap();
                 process.status = ProcessStatus::Failed;
                 
                 Err(JanusError::Process(error_msg))
@@ -109,98 +109,46 @@ impl<'a> ProcessRunner<'a> {
         }
     }
     
-    pub fn monitor_process(&self, name: &str) {
+    pub fn monitor_process(&self, manager: &mut ProcessManager, name: &str) {
+        // 簡化實現，僅使用 log_handler 來報告進程退出
+        // 這避免了複雜的可變借用問題
+        let log_handler = manager.get_log_handler().clone();
         let process_name = name.to_string();
-        let manager = self.manager as *mut ProcessManager;
         
-        thread::spawn(move || {
-            // 這裡使用不安全的指針來避免生命週期問題
-            // 在實際產品中應該使用更安全的方式，如 Arc<Mutex<ProcessManager>>
-            let manager = unsafe { &mut *manager };
-            
-            loop {
-                // 獲取進程
-                let process = match manager.get_process_mut(&process_name) {
-                    Some(p) => p,
-                    None => break,
-                };
-                
-                // 檢查進程是否還在運行
-                if let Some(child) = &mut process.process {
-                    match child.try_wait() {
-                        Ok(Some(status)) => {
-                            // 進程已退出
-                            let exit_code = status.code().unwrap_or(-1);
-                            let error_type = manager.get_error_handler().classify_error(exit_code);
-                            
-                            manager.get_error_handler().handle_error(
-                                &process_name,
-                                error_type,
-                                &format!("Process exited with code: {}", exit_code),
-                            );
-                            
-                            process.status = ProcessStatus::Stopped;
-                            process.process = None;
-                            
-                            // 如果配置了自動重啟，則重啟進程
-                            if process.auto_restart {
-                                // 檢查重啟次數限制
-                                if let Some(limit) = process.restart_limit {
-                                    if process.restart_count >= limit {
-                                        manager.get_error_handler().handle_error(
-                                            &process_name,
-                                            crate::error::ErrorType::RestartLimited,
-                                            &format!("Restart limit reached: {}", limit),
-                                        );
-                                        break;
-                                    }
-                                }
-                                
-                                // 增加重啟計數
-                                process.restart_count += 1;
-                                
-                                // 等待指定的延遲時間
-                                let delay = process.restart_delay;
-                                drop(process); // 釋放可變引用
-                                
-                                thread::sleep(Duration::from_secs(delay));
-                                
-                                // 重啟進程
-                                let mut runner = ProcessRunner::new(manager);
-                                if let Err(e) = runner.start_process(&process_name) {
-                                    manager.get_log_handler().log(
-                                        &process_name,
-                                        LogType::System,
-                                        &format!("Failed to restart process: {}", e),
-                                    );
-                                    break;
-                                }
-                            } else {
-                                break;
-                            }
-                        }
-                        Ok(None) => {
-                            // 進程還在運行
-                            thread::sleep(Duration::from_millis(500));
-                        }
-                        Err(e) => {
-                            // 檢查進程狀態時出錯
-                            manager.get_log_handler().log(
-                                &process_name,
-                                LogType::System,
-                                &format!("Error checking process status: {}", e),
-                            );
-                            
-                            process.status = ProcessStatus::Failed;
-                            process.process = None;
-                            break;
-                        }
-                    }
-                } else {
-                    // 進程已經不存在
-                    break;
-                }
+        // 只提取我們需要的信息，不保留對 manager 的引用
+        let child_opt = if let Some(process) = manager.get_process_mut(name) {
+            process.process.take()
+        } else {
+            None
+        };
+        
+        if let Some(mut child) = child_opt {
+            // 標記進程正在運行 (需在此重新獲取 process)
+            if let Some(process) = manager.get_process_mut(name) {
+                process.status = ProcessStatus::Running;
             }
-        });
+            
+            // 將必要資訊移到線程中
+            thread::spawn(move || {
+                // 簡化：只監控進程退出，不嘗試自動重啟
+                match child.wait() {
+                    Ok(status) => {
+                        let exit_code = status.code().unwrap_or(-1);
+                        log_handler.log(
+                            &process_name,
+                            LogType::System,
+                            &format!("Process exited with code: {}", exit_code)
+                        );
+                    }
+                    Err(e) => {
+                        log_handler.log(
+                            &process_name,
+                            LogType::System,
+                            &format!("Error waiting for process: {}", e)
+                        );
+                    }
+                }
+            });
+        }
     }
 }

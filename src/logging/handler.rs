@@ -4,6 +4,7 @@ use std::io::Write;
 
 use crate::logging::{LogEntry, LogType};
 
+#[derive(Clone)]
 pub struct LogHandler {
     log_level: String,
 }

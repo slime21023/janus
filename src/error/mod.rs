@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+pub mod handler;
+
 #[derive(Error, Debug)]
 pub enum JanusError {
     #[error("IO error: {0}")]

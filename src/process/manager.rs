@@ -96,10 +96,10 @@ impl ProcessManager {
     }
     
     pub fn start_all(&mut self) -> Result<()> {
-        let process_runner = ProcessRunner::new(self);
+        let process_runner = ProcessRunner::new();
         
         for name in self.processes.keys().cloned().collect::<Vec<_>>() {
-            if let Err(e) = process_runner.start_process(&name) {
+            if let Err(e) = process_runner.start_process(self, &name) {
                 self.log_handler.log(
                     &name,
                     LogType::System,
@@ -133,7 +133,7 @@ impl ProcessManager {
     }
     
     pub fn restart_process(&mut self, name: &str) -> Result<()> {
-        let process_runner = ProcessRunner::new(self);
+        let process_runner = ProcessRunner::new();
         
         // 先停止
         if let Some(process) = self.processes.get_mut(name) {
@@ -156,7 +156,7 @@ impl ProcessManager {
         }
         
         // 再啟動
-        process_runner.start_process(name)?;
+        process_runner.start_process(self, name)?;
         
         Ok(())
     }
