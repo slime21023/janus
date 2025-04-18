@@ -1,5 +1,5 @@
 use colored::*;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::error::Result;
 use crate::process::{manager::ProcessManager, ProcessStatus};

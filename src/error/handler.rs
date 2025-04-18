@@ -1,4 +1,4 @@
-use crate::error::{ErrorType, JanusError, Result};
+use crate::error::ErrorType;
 use crate::logging::handler::LogHandler;
 use crate::logging::LogType;
 

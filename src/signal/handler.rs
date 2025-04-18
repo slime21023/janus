@@ -1,9 +1,8 @@
 #[cfg(not(windows))]
 use signal_hook::{consts::{SIGINT, SIGTERM}, iterator::Signals};
 use std::sync::{Arc, Mutex};
-use std::thread;
 
-use crate::error::{JanusError, Result};
+use crate::error::Result;
 use crate::process::manager::ProcessManager;
 
 pub struct SignalHandler {

@@ -1,8 +1,7 @@
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::thread;
-use std::time::{Duration, Instant};
-use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use crate::error::{JanusError, Result};
 use crate::logging::LogType;

@@ -1,5 +1,4 @@
 use std::fs;
-use std::path::Path;
 
 use crate::config::{Config, GlobalConfig, ProcessConfig};
 use crate::error::{JanusError, Result};
