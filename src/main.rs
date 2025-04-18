@@ -20,6 +20,24 @@ async fn main() -> Result<()> {
     // 獲取命令行參數
     let args: Vec<String> = env::args().collect();
     
+    // 檢查是否是幫助或版本命令
+    if args.len() > 1 && (args[1] == "--help" || args[1] == "-h" || args[1] == "--version" || args[1] == "-V") {
+        // 直接創建命令解析器並顯示幫助信息
+        let empty_manager = Arc::new(Mutex::new(ProcessManager::new_empty()));
+        let command_parser = CommandParser::new(empty_manager);
+        
+        if args[1] == "--help" || args[1] == "-h" {
+            // 手動顯示幫助信息
+            let mut cli = command_parser.build_cli();
+            println!("{}", cli.render_help());
+        } else {
+            // 顯示版本信息
+            let cli = command_parser.build_cli();
+            println!("{} {}", cli.get_name(), cli.get_version().unwrap_or("unknown"));
+        }
+        return Ok(());
+    }
+    
     // 默認配置文件路徑
     let default_config = "janus.toml";
     

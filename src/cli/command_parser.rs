@@ -30,51 +30,147 @@ impl CommandParser {
         }
     }
     
-    fn build_cli(&self) -> Command {
+    pub fn build_cli(&self) -> Command {
         Command::new("janus")
             .version("0.1.0")
-            .author("Your Name <your.email@example.com>")
+            .author("Janus Team")
             .about("A lightweight process manager for container environments")
+            .long_about(
+                "Janus is a lightweight process manager designed specifically for container environments. \
+                It provides simple yet powerful commands to manage multiple processes, \
+                with features like auto-restart, status monitoring, and structured logging."
+            )
             .arg(
                 Arg::new("config")
                     .short('c')
                     .long("config")
                     .value_name("FILE")
                     .help("Sets a custom config file")
+                    .long_help(
+                        "Specify a custom configuration file path instead of using the default 'janus.toml'. \
+                        The configuration file defines processes to manage, their startup parameters, \
+                        working directories, environment variables, and restart policies."
+                    )
             )
-            .subcommand(Command::new("start").about("Start all processes"))
-            .subcommand(Command::new("stop").about("Stop all processes"))
-            .subcommand(Command::new("restart").about("Restart all processes"))
-            .subcommand(Command::new("status").about("Show status of all processes"))
+            .subcommand(
+                Command::new("start")
+                    .about("Start all processes")
+                    .long_about(
+                        "Start all processes defined in the configuration file. \
+                        Processes that are already running will be skipped. \
+                        Any startup errors will be reported, but won't prevent other processes from starting."
+                    )
+                    .display_order(1)
+            )
+            .subcommand(
+                Command::new("stop")
+                    .about("Stop all processes")
+                    .long_about(
+                        "Stop all currently running processes managed by Janus. \
+                        This sends a termination signal to each process and waits for them to exit gracefully. \
+                        For containers, this is often the command to use before shutting down."
+                    )
+                    .display_order(2)
+            )
+            .subcommand(
+                Command::new("restart")
+                    .about("Restart all processes")
+                    .long_about(
+                        "Restart all processes by stopping them if they're running, then starting them again. \
+                        This is useful when you need to reload all processes, such as after a configuration change."
+                    )
+                    .display_order(3)
+            )
+            .subcommand(
+                Command::new("status")
+                    .about("Show status of all processes")
+                    .long_about(
+                        "Display detailed status information for all processes, including their running state, \
+                        uptime (for running processes), command, arguments, environment variables, \
+                        and restart configuration."
+                    )
+                    .display_order(4)
+            )
             .subcommand(
                 Command::new("start-one")
                     .about("Start a specific process")
+                    .long_about(
+                        "Start a single process by name. If the process is already running, it will be skipped. \
+                        This command is useful when you want to start processes selectively."
+                    )
                     .arg(
                         Arg::new("name")
-                            .help("Process name")
+                            .help("Name of the process to start")
+                            .long_help(
+                                "The process name as defined in the configuration file. \
+                                This must match exactly the name in the [process.NAME] section."
+                            )
                             .required(true)
                             .index(1),
-                    ),
+                    )
+                    .display_order(5)
+                    .after_help("Example: janus start-one web-server")
             )
             .subcommand(
                 Command::new("stop-one")
                     .about("Stop a specific process")
+                    .long_about(
+                        "Stop a single process by name. If the process is not running, a message will be displayed. \
+                        This command sends a termination signal and waits for the process to exit gracefully."
+                    )
                     .arg(
                         Arg::new("name")
-                            .help("Process name")
+                            .help("Name of the process to stop")
+                            .long_help(
+                                "The process name as defined in the configuration file. \
+                                This must match exactly the name in the [process.NAME] section."
+                            )
                             .required(true)
                             .index(1),
-                    ),
+                    )
+                    .display_order(6)
+                    .after_help("Example: janus stop-one database")
             )
             .subcommand(
                 Command::new("restart-one")
                     .about("Restart a specific process")
+                    .long_about(
+                        "Restart a single process by name, stopping it first if it's running, then starting it again. \
+                        This is useful for reloading a specific process after configuration changes."
+                    )
                     .arg(
                         Arg::new("name")
-                            .help("Process name")
+                            .help("Name of the process to restart")
+                            .long_help(
+                                "The process name as defined in the configuration file. \
+                                This must match exactly the name in the [process.NAME] section."
+                            )
                             .required(true)
                             .index(1),
-                    ),
+                    )
+                    .display_order(7)
+                    .after_help("Example: janus restart-one api-service")
+            )
+            .after_help(
+                "CONFIGURATION FILE FORMAT:\n\
+                The configuration file uses TOML format with the following structure:\n\n\
+                [global]\n\
+                log_level = \"info\"  # Optional, default is \"info\"\n\
+                working_dir = \"/app\"  # Optional, default working directory\n\
+                env = { KEY = \"value\" }  # Optional, global environment variables\n\n\
+                [process.web-server]\n\
+                command = \"node\"\n\
+                args = [\"server.js\"]\n\
+                working_dir = \"/app/web\"  # Overrides global working_dir\n\
+                env = { PORT = \"8080\" }  # Merged with global env\n\
+                auto_restart = true  # Optional, default is false\n\
+                restart_limit = 5  # Optional, maximum number of restarts\n\
+                restart_delay = 2  # Optional, seconds to wait before restart\n\n\
+                [process.worker]\n\
+                command = \"python\"\n\
+                args = [\"worker.py\"]\n\
+                auto_restart = true\n\n\
+                For more information and examples, visit: https://github.com/example/janus"
             )
     }
     

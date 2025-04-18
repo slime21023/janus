@@ -17,6 +17,13 @@ pub struct ProcessManager {
 }
 
 impl ProcessManager {
+    pub fn new_empty() -> Self {
+        Self {
+            processes: HashMap::new(),
+            log_handler: LogHandler::new("info"),
+        }
+    }
+
     pub fn new(config_manager: ConfigManager, log_handler: LogHandler) -> Self {
         // 從配置中獲取進程
         let processes = config_manager
@@ -273,7 +280,7 @@ impl ProcessManager {
                 
                 // 設置監控進程退出
                 {
-                    let mut process = self.get_process_mut(&process_name).unwrap();
+                    let process = self.get_process_mut(&process_name).unwrap();
                     process.process = Some(child);
                     process.status = ProcessStatus::Running;
                     process.start_time = Some(Instant::now());
@@ -305,7 +312,7 @@ impl ProcessManager {
                 let error_msg = format!("Failed to start process: {}", e);
                 log_handler.log(&process_name, LogType::System, &error_msg);
                 
-                let mut process = self.get_process_mut(&process_name).unwrap();
+                let process = self.get_process_mut(&process_name).unwrap();
                 process.status = ProcessStatus::Failed;
                 
                 Err(JanusError::Process(error_msg))
