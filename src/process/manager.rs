@@ -58,6 +58,7 @@ impl ProcessManager {
         &self.processes
     }
 
+    // get_process 方法雖然當前未被使用，但保留它以便將來擴展
     pub fn get_process(&self, name: &str) -> Option<&ManagedProcess> {
         self.processes.get(name)
     }
@@ -66,6 +67,7 @@ impl ProcessManager {
         self.processes.get_mut(name)
     }
 
+    // start_all 方法雖然當前未被使用，但保留它以便將來擴展
     pub async fn start_all(&mut self) -> Result<()> {
         let process_names: Vec<String> = self.processes.keys().cloned().collect();
         
@@ -171,30 +173,23 @@ impl ProcessManager {
         let process_name = name.to_string();
         
         // 獲取並處理進程
-        let command_str;
-        let args;
-        let env;
-        let working_dir;
+        let process = self.get_process_mut(name).unwrap();
         
-        {
-            let process = self.get_process_mut(name).unwrap();
-            
-            // 如果進程已在運行，則直接返回
-            if process.status == ProcessStatus::Running {
-                log_handler.log(
-                    name,
-                    LogType::System,
-                    "Process already running",
-                );
-                return Ok(());
-            }
-            
-            // 複製所需信息以避免借用問題
-            command_str = process.command.clone();
-            args = process.args.clone();
-            env = process.env.clone();
-            working_dir = process.working_dir.clone();
+        // 如果進程已在運行，則直接返回
+        if process.status == ProcessStatus::Running {
+            log_handler.log(
+                name,
+                LogType::System,
+                "Process already running",
+            );
+            return Ok(());
         }
+        
+        // 複製所需信息以避免借用問題
+        let command_str = process.command.clone();
+        let args = process.args.clone();
+        let env = process.env.clone();
+        let working_dir = process.working_dir.clone();
         
         // 創建命令（避免借用衝突）
         let mut command = Command::new(&command_str);
@@ -278,21 +273,19 @@ impl ProcessManager {
                     });
                 }
                 
-                // 設置監控進程退出
-                {
-                    let process = self.get_process_mut(&process_name).unwrap();
-                    process.process = Some(child);
-                    process.status = ProcessStatus::Running;
-                    process.start_time = Some(Instant::now());
-                }
+                // 保存進程狀態
+                process.process = Some(child);
+                process.status = ProcessStatus::Running;
+                process.start_time = Some(Instant::now());
                 
-                // 創建共享引用用於監控
+                // 創建進程監控
                 let process_name_clone = process_name.clone();
                 let log_handler_clone = log_handler.clone();
                 
                 // 監控進程退出
                 tokio::spawn(async move {
-                    // 簡單的方案是僅記錄啟動監控
+                    // 因為架構限制，這裡只能記錄監控開始
+                    // 實際的進程監控和重啟邏輯需要更複雜的設計
                     log_handler_clone.log(
                         &process_name_clone,
                         LogType::System,

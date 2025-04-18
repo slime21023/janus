@@ -5,15 +5,12 @@ use std::io::Write;
 use crate::logging::{LogEntry, LogType};
 
 #[derive(Clone)]
-pub struct LogHandler {
-    log_level: String,
-}
+pub struct LogHandler {}
 
 impl LogHandler {
-    pub fn new(log_level: &str) -> Self {
-        Self {
-            log_level: log_level.to_string(),
-        }
+    pub fn new(_log_level: &str) -> Self {
+        // 保留參數以保持 API 兼容性，但不存儲它
+        Self {}
     }
     
     pub fn log(&self, process_name: &str, log_type: LogType, content: &str) {

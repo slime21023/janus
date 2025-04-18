@@ -1,34 +1,8 @@
-use crate::error::ErrorType;
-use crate::logging::handler::LogHandler;
-use crate::logging::LogType;
+// 此模塊保留用於將來擴展，但當前內容已被簡化
+// 未來可以在此添加更複雜的錯誤處理邏輯，如：
+// - 特定類型錯誤的處理策略
+// - 錯誤報告和日誌記錄
+// - 重試邏輯
 
-pub struct ErrorHandler {
-    log_handler: LogHandler,
-}
-
-impl ErrorHandler {
-    pub fn new(log_handler: LogHandler) -> Self {
-        Self { log_handler }
-    }
-    
-    pub fn handle_error(&self, process_name: &str, error_type: ErrorType, message: &str) {
-        let error_msg = format!("[{}] {}: {}", error_type_to_string(&error_type), process_name, message);
-        self.log_handler.log(process_name, LogType::System, &error_msg);
-    }
-    
-    pub fn classify_error(&self, exit_code: i32) -> ErrorType {
-        match exit_code {
-            0 => ErrorType::AbnormalExit, // 正常退出但未預期
-            _ => ErrorType::StartFailed,  // 非零退出碼
-        }
-    }
-}
-
-fn error_type_to_string(error_type: &ErrorType) -> &'static str {
-    match error_type {
-        ErrorType::StartFailed => "START_FAILED",
-        ErrorType::AbnormalExit => "ABNORMAL_EXIT",
-        ErrorType::RestartLimited => "RESTART_LIMITED",
-        ErrorType::ConfigInvalid => "CONFIG_INVALID",
-    }
-}
+// 移除了原有的 ErrorHandler 實現，因為它未被項目使用
+// 符合"極簡化設計"的目標

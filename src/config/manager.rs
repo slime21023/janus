@@ -5,7 +5,6 @@ use crate::error::{JanusError, Result};
 
 #[derive(Debug)]
 pub struct ConfigManager {
-    config_path: String,
     config: Config,
 }
 
@@ -14,7 +13,6 @@ impl ConfigManager {
         let config = Self::load_config(config_path)?;
         
         let manager = Self {
-            config_path: config_path.to_string(),
             config,
         };
         
@@ -23,14 +21,7 @@ impl ConfigManager {
         Ok(manager)
     }
     
-    pub fn reload(&mut self) -> Result<()> {
-        self.config = Self::load_config(&self.config_path)?;
-        self.validate()?;
-        Ok(())
-    }
-    
     pub fn validate(&self) -> Result<()> {
-        // 檢查進程名稱唯一性
         let mut names = std::collections::HashSet::new();
         
         for process in &self.config.process {
@@ -41,7 +32,6 @@ impl ConfigManager {
                 )));
             }
             
-            // 檢查命令非空
             if process.command.trim().is_empty() {
                 return Err(JanusError::Config(format!(
                     "Empty command for process: {}",
@@ -62,14 +52,19 @@ impl ConfigManager {
     }
     
     fn load_config(config_path: &str) -> Result<Config> {
-        let config_str = fs::read_to_string(config_path).map_err(|e| {
-            JanusError::Config(format!("Failed to read config file: {}", e))
-        })?;
+        let config_content = match fs::read_to_string(config_path) {
+            Ok(content) => content,
+            Err(e) => {
+                return Err(JanusError::Config(format!(
+                    "Failed to read config file: {}",
+                    e
+                )))
+            }
+        };
         
-        let config: Config = toml::from_str(&config_str).map_err(|e| {
-            JanusError::Config(format!("Failed to parse TOML: {}", e))
-        })?;
-        
-        Ok(config)
+        match toml::from_str::<Config>(&config_content) {
+            Ok(config) => Ok(config),
+            Err(e) => Err(JanusError::Config(format!("Failed to parse config file: {}", e))),
+        }
     }
 }

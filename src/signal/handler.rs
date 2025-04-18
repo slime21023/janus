@@ -1,6 +1,7 @@
 #[cfg(unix)]
 use tokio::signal::unix::{signal, SignalKind};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use crate::error::Result;
 use crate::process::manager::ProcessManager;
@@ -32,9 +33,12 @@ impl SignalHandler {
                     }
                 }
                 
-                if let Ok(mut manager) = manager.lock() {
-                    let _ = manager.stop_all();
+                // tokio::sync::Mutex 可以安全地在異步上下文中使用
+                let mut manager_guard = manager.lock().await;
+                if let Err(e) = manager_guard.stop_all().await {
+                    println!("Error during shutdown: {}", e);
                 }
+                
                 std::process::exit(0);
             });
         }
@@ -49,9 +53,12 @@ impl SignalHandler {
                 let _ = tokio::signal::ctrl_c().await;
                 println!("Received Ctrl+C, shutting down...");
                 
-                if let Ok(mut manager) = manager.lock() {
-                    let _ = manager.stop_all();
+                // tokio::sync::Mutex 可以安全地在異步上下文中使用
+                let mut manager_guard = manager.lock().await;
+                if let Err(e) = manager_guard.stop_all().await {
+                    println!("Error during shutdown: {}", e);
                 }
+                
                 std::process::exit(0);
             });
             

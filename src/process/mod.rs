@@ -3,23 +3,14 @@ use std::collections::HashMap;
 use std::time::Instant;
 use tokio::process::Child;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum ProcessStatus {
-    Running,
     Stopped,
+    Running,
     Failed,
 }
 
-impl std::fmt::Display for ProcessStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ProcessStatus::Running => write!(f, "RUNNING"),
-            ProcessStatus::Stopped => write!(f, "STOPPED"),
-            ProcessStatus::Failed => write!(f, "FAILED"),
-        }
-    }
-}
-
+// ManagedProcess 不能自動派生 Clone，因為 tokio::process::Child 不實現 Clone
 pub struct ManagedProcess {
     pub name: String,
     pub command: String,
@@ -35,6 +26,7 @@ pub struct ManagedProcess {
     pub start_time: Option<Instant>,
 }
 
+// 手動實現 Clone，避免克隆 tokio::process::Child
 impl Clone for ManagedProcess {
     fn clone(&self) -> Self {
         Self {
@@ -48,8 +40,8 @@ impl Clone for ManagedProcess {
             restart_limit: self.restart_limit,
             restart_delay: self.restart_delay,
             status: self.status.clone(),
-            process: None, 
-            start_time: self.start_time.clone(),
+            process: None, // 不克隆進程句柄
+            start_time: self.start_time, // Instant 已實現 Copy，無需克隆
         }
     }
 }

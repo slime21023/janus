@@ -1,32 +1,28 @@
-use thiserror::Error;
+use std::io;
+use std::result;
 
-pub mod handler;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum JanusError {
     #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(#[from] io::Error),
     
-    #[error("Configuration error: {0}")]
+    #[error("Config error: {0}")]
     Config(String),
     
     #[error("Process error: {0}")]
     Process(String),
     
-    #[error("Signal handling error: {0}")]
-    Signal(String),
-    
     #[error("Command error: {0}")]
     Command(String),
 }
 
-pub type Result<T> = std::result::Result<T, JanusError>;
+pub type Result<T> = result::Result<T, JanusError>;
 
-// 錯誤類型枚舉
-#[derive(Debug, Clone, PartialEq)]
-pub enum ErrorType {
-    StartFailed,
-    AbnormalExit,
-    RestartLimited,
-    ConfigInvalid,
+// 重構：移除未使用的錯誤類型和處理器
+// 後續可以根據需要重新添加更合適的錯誤類型
+
+pub mod handler {
+    // 這個模塊保留用於將來擴展，但當前簡化為空
 }

@@ -6,7 +6,8 @@ mod process;
 mod signal;
 
 use std::env;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use cli::command_parser::CommandParser;
 use config::manager::ConfigManager;
