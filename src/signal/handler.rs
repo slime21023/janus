@@ -1,5 +1,5 @@
-#[cfg(not(windows))]
-use signal_hook::{consts::{SIGINT, SIGTERM}, iterator::Signals};
+#[cfg(unix)]
+use tokio::signal::unix::{signal, SignalKind};
 use std::sync::{Arc, Mutex};
 
 use crate::error::Result;
@@ -14,34 +14,48 @@ impl SignalHandler {
         Self { manager }
     }
     
-    pub fn register_signals(&self) -> Result<()> {
-        #[cfg(not(windows))]
+    pub async fn register_signals(&self) -> Result<()> {
+        #[cfg(unix)]
         {
-            let signals = Signals::new(&[SIGINT, SIGTERM])
-                .map_err(|e| JanusError::Signal(format!("Failed to register signals: {}", e)))?;
+            let mut sigint = signal(SignalKind::interrupt())?;
+            let mut sigterm = signal(SignalKind::terminate())?;
             
             let manager = self.manager.clone();
             
-            thread::spawn(move || {
-                for signal in signals.forever() {
-                    match signal {
-                        SIGINT | SIGTERM => {
-                            println!("Received termination signal, shutting down...");
-                            if let Ok(mut manager) = manager.lock() {
-                                let _ = manager.stop_all();
-                            }
-                            std::process::exit(0);
-                        }
-                        _ => unreachable!(),
+            tokio::spawn(async move {
+                tokio::select! {
+                    _ = sigint.recv() => {
+                        println!("Received SIGINT, shutting down...");
+                    }
+                    _ = sigterm.recv() => {
+                        println!("Received SIGTERM, shutting down...");
                     }
                 }
+                
+                if let Ok(mut manager) = manager.lock() {
+                    let _ = manager.stop_all();
+                }
+                std::process::exit(0);
             });
         }
         
+        // Windows 平台簡化處理
         #[cfg(windows)]
         {
-            println!("Signal handling is limited on Windows platform");
-            // Windows 平台下使用 ctrlc 替代方案或簡單提示
+            let manager = self.manager.clone();
+            
+            // 在 Windows 上使用 tokio 的 ctrl_c 處理程序
+            tokio::spawn(async move {
+                let _ = tokio::signal::ctrl_c().await;
+                println!("Received Ctrl+C, shutting down...");
+                
+                if let Ok(mut manager) = manager.lock() {
+                    let _ = manager.stop_all();
+                }
+                std::process::exit(0);
+            });
+            
+            println!("Ctrl+C handler registered");
         }
         
         Ok(())

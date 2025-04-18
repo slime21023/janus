@@ -15,7 +15,8 @@ use logging::handler::LogHandler;
 use process::manager::ProcessManager;
 use signal::handler::SignalHandler;
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     // 獲取命令行參數
     let args: Vec<String> = env::args().collect();
     
@@ -50,13 +51,13 @@ fn main() -> Result<()> {
     
     // 初始化信號處理器
     let signal_handler = SignalHandler::new(manager.clone());
-    signal_handler.register_signals()?;
+    signal_handler.register_signals().await?;
     
     // 初始化命令解析器
     let command_parser = CommandParser::new(manager);
     
     // 解析並執行命令
-    command_parser.parse_and_execute(args)?;
+    command_parser.parse_and_execute(args).await?;
     
     Ok(())
 }

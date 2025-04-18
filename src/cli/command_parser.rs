@@ -15,17 +15,17 @@ impl CommandParser {
         Self { manager }
     }
     
-    pub fn parse_and_execute(&self, args: Vec<String>) -> Result<()> {
+    pub async fn parse_and_execute(&self, args: Vec<String>) -> Result<()> {
         let matches = self.build_cli().get_matches_from(args);
         
         match matches.subcommand() {
-            Some(("start", _)) => self.cmd_start_all(),
-            Some(("stop", _)) => self.cmd_stop_all(),
-            Some(("restart", _)) => self.cmd_restart_all(),
+            Some(("start", _)) => self.cmd_start_all().await,
+            Some(("stop", _)) => self.cmd_stop_all().await,
+            Some(("restart", _)) => self.cmd_restart_all().await,
             Some(("status", _)) => self.cmd_status(),
-            Some(("start-one", sub_m)) => self.cmd_start_one(sub_m),
-            Some(("stop-one", sub_m)) => self.cmd_stop_one(sub_m),
-            Some(("restart-one", sub_m)) => self.cmd_restart_one(sub_m),
+            Some(("start-one", sub_m)) => self.cmd_start_one(sub_m).await,
+            Some(("stop-one", sub_m)) => self.cmd_stop_one(sub_m).await,
+            Some(("restart-one", sub_m)) => self.cmd_restart_one(sub_m).await,
             _ => Err(JanusError::Command("Unknown command".to_string())),
         }
     }
@@ -78,27 +78,53 @@ impl CommandParser {
             )
     }
     
-    fn cmd_start_all(&self) -> Result<()> {
+    async fn cmd_start_all(&self) -> Result<()> {
         println!("Starting all processes...");
         let mut manager = self.manager.lock().unwrap();
-        manager.start_all()?;
+        
+        // 獲取所有進程名稱
+        let process_names: Vec<String> = manager.get_all_processes()
+            .keys()
+            .cloned()
+            .collect();
+        
+        // 依次啟動所有進程
+        for name in process_names {
+            if let Err(e) = manager.start_process(&name).await {
+                eprintln!("Failed to start {}: {}", name, e);
+            }
+        }
+        
         println!("All processes started");
         Ok(())
     }
     
-    fn cmd_stop_all(&self) -> Result<()> {
+    async fn cmd_stop_all(&self) -> Result<()> {
         println!("Stopping all processes...");
         let mut manager = self.manager.lock().unwrap();
-        manager.stop_all()?;
+        manager.stop_all().await?;
         println!("All processes stopped");
         Ok(())
     }
     
-    fn cmd_restart_all(&self) -> Result<()> {
+    async fn cmd_restart_all(&self) -> Result<()> {
         println!("Restarting all processes...");
         let mut manager = self.manager.lock().unwrap();
-        manager.stop_all()?;
-        manager.start_all()?;
+        manager.stop_all().await?;
+        
+        // 獲取所有進程名稱
+        let process_names: Vec<String> = manager.get_all_processes()
+            .keys()
+            .cloned()
+            .collect();
+        
+        // 依次啟動所有進程
+        for name in process_names {
+            if let Err(e) = manager.start_process(&name).await {
+                eprintln!("Failed to restart {}: {}", name, e);
+            }
+        }
+        
         println!("All processes restarted");
         Ok(())
     }
@@ -110,19 +136,18 @@ impl CommandParser {
         Ok(())
     }
     
-    fn cmd_start_one(&self, matches: &ArgMatches) -> Result<()> {
+    async fn cmd_start_one(&self, matches: &ArgMatches) -> Result<()> {
         let name = matches.get_one::<String>("name").unwrap();
         println!("Starting process: {}", name);
         
         let mut manager = self.manager.lock().unwrap();
-        let runner = crate::process::runner::ProcessRunner::new();
-        runner.start_process(&mut manager, name)?;
+        manager.start_process(name).await?;
         
         println!("Process started: {}", name);
         Ok(())
     }
     
-    fn cmd_stop_one(&self, matches: &ArgMatches) -> Result<()> {
+    async fn cmd_stop_one(&self, matches: &ArgMatches) -> Result<()> {
         let name = matches.get_one::<String>("name").unwrap();
         println!("Stopping process: {}", name);
         
@@ -132,7 +157,8 @@ impl CommandParser {
         })?;
         
         if let Some(child) = &mut process.process {
-            if let Err(e) = child.kill() {
+            // 使用 tokio 的 Child::kill() 並等待進程退出
+            if let Err(e) = child.kill().await {
                 return Err(JanusError::Process(format!("Failed to kill process: {}", e)));
             }
             process.status = crate::process::ProcessStatus::Stopped;
@@ -145,12 +171,12 @@ impl CommandParser {
         }
     }
     
-    fn cmd_restart_one(&self, matches: &ArgMatches) -> Result<()> {
+    async fn cmd_restart_one(&self, matches: &ArgMatches) -> Result<()> {
         let name = matches.get_one::<String>("name").unwrap();
         println!("Restarting process: {}", name);
         
         let mut manager = self.manager.lock().unwrap();
-        manager.restart_process(name)?;
+        manager.restart_process(name).await?;
         
         println!("Process restarted: {}", name);
         Ok(())
